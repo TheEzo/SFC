@@ -5,13 +5,33 @@ using namespace std;
 
 class Robot {
 public:
-    Robot(double, double, int, double *);
+    Robot(double, double, int, const double *, const double *, const double *, const double *, const double *);
     ~Robot();
-    void count(const double *);
+    double update(const double *, const double *source);
+    /**
+     * Getter for setting global best coordinates
+     * @return
+     */
+    double *get_coordinates();
+    double get_fitness();
 
 private:
-    double get_weight(double, int, double);
-    void func(double, double);
+    /**
+     * Compute weight for k+1 step
+     * @param w - current weight
+     * @param i - index of coordinates (whether it is x or y)
+     * @param global_best - global best position
+     * @return weight for coordinates
+     */
+    double get_weight(double w, int i, double global_best);
+
+    /**
+    * Compute robot fitness function
+    * @param source - source of acoustic signal
+    * @return fitness function
+    */
+    void func(const double *source);
+    void update_deltas();
 
     // Map size
     double x_min, x_max, y_min, y_max;
@@ -26,6 +46,8 @@ private:
     double position[2];
     double best_pos[2];
     int delta_f, delta_f_prev;
+    double robot_fitness;
+    double robot_fitness_prev;
 };
 
 

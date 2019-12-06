@@ -3,10 +3,10 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
-Robot::Robot(double w_0, double max_velocity, int map_size, double *weight_limit) {
-    std::default_random_engine generator;
-    std::uniform_real_distribution<double> uniform(0.0, 1.0);
+Robot::Robot(double w_0, double max_velocity, int map_size, const double *weight_limit, const double *source,
+             const double *position, const double *velocity, const double *r) {
 
     // initial weight
     this->w_0 = w_0;
@@ -16,21 +16,20 @@ Robot::Robot(double w_0, double max_velocity, int map_size, double *weight_limit
     x_min = y_min = -map_size;
     x_max = y_max = map_size;
 
-    // random r1, r2 <0;1>
-    r1 = uniform(generator);
-    r2 = uniform(generator);
+    r1 = r[0];
+    r2 = r[1];
+
+    robot_fitness = -std::numeric_limits<double>::infinity();
+    robot_fitness_prev = -std::numeric_limits<double>::infinity();
 
     for(int i = 0; i < 2; i++){
         this->weight_limit[i] = weight_limit[i];
-        // initial weight i w_0
+        // initial weight is w_0
         weight[i] = w_0;
-        // random position in map
-        position[i] = uniform(generator) * map_size * 2 - map_size;
-        // robot best position is current position
-        best_pos[i] = position[i];
-        // initial velocity is also random, but less than max_velocity
-        velocity[i] = uniform(generator) * 2 * max_velocity - max_velocity;
+        this->position[i] = position[i];
+        this->velocity[i] = velocity[i];
     }
+    func(source);
 
     // set delta to 0, so initial weight is used as default
     delta_f = 0, delta_f_prev = 0;
@@ -38,25 +37,42 @@ Robot::Robot(double w_0, double max_velocity, int map_size, double *weight_limit
 
 Robot::~Robot() = default;
 
-void Robot::count(const double *global_best) {
+double Robot::update(const double *global_best, const double *source) {
+    if(robot_fitness == 0.0)
+        return 0.0; // already on target
+
     // For each dimension
-    double new_position[2], new_velocity[2], new_weight[2], c;
+    double new_position[2], c;
 
-    for(int i = 0; i < 2; i++){
-        new_weight[i] = get_weight(weight[i], i, global_best[i]);
+    for(int i = 0; i < 2; i++) {
         // acceleration coefficient c = c1 = c2 = current step weight(w) + 1
-        c = new_weight[i]  + 1;
-        new_velocity[i] = new_weight[i] * velocity[i] +  c * r1 * (best_pos[i] - position[i]) +
-                                                         c * r2 * (global_best[i] - position[i]);
-        if(new_velocity[i] > max_velocity)
-            std::cerr << "Velocity too big" << std::endl;
-    }
+        c = weight[i] + 1;
+        velocity[i] = weight[i] * velocity[i] + c * r1 * (best_pos[i] - position[i]) +
+                                                c * r2 * (global_best[i] - position[i]);
+        if (velocity[i] > max_velocity)
+            velocity[i] = max_velocity;
 
-    for(int i = 0; i < 2; i++){
-        weight[i] = new_weight[i];
-        position[i] = new_position[i];
-        velocity[i] = new_velocity[i];
+        new_position[i] = position[i] + velocity[i];
+        if (new_position[i] > 150)
+            position[i] = 150.0;
+        else if (new_position[i] < -150)
+            position[i] = -150;
+        else
+            position[i] = new_position[i];
+
     }
+    func(source);
+//    cout << robot_fitness << " --- <" << position[0] << "; " << position[1] << "> " << endl;
+    if(robot_fitness > robot_fitness_prev){
+        best_pos[0] = position[0];
+        best_pos[1] = position[1];
+    }
+    for(int i = 0; i < 2; i++) {
+        // todo update d(k)???
+        update_deltas();
+        weight[i] = get_weight(weight[i], i, global_best[i]);
+    }
+    return robot_fitness;
 }
 
 double Robot::get_weight(double w, int i, double global_best) {
@@ -64,21 +80,35 @@ double Robot::get_weight(double w, int i, double global_best) {
     double l = pow(2 * y_max, 2);
 
     if(delta_f_prev > 0 && delta_f > 0){
-        double func = (pow((position[i] - global_best), 3)/(c_n * l));
-        w = min(weight_limit[1], w + w_0 * exp(-func));
+        double function = (pow((position[i] - global_best), 3)/(c_n * l));
+        w = min(weight_limit[1], w + w_0 * exp(-function));
     }
     else if(delta_f_prev < 0 && delta_f < 0){
-        double func = (pow((position[i] - global_best), 2)/(c_n * l));
-        w = max(weight_limit[0], w - w_0 * exp(-func));
+        double function = (pow((position[i] - global_best), 2)/(c_n * l));
+        w = max(weight_limit[0], w - w_0 * exp(-function));
     }
-    else{
-        // nothing to do
-    }
-
+    else{} // nothing to do
     return w;
 }
 
-void Robot::func(double x, double y) {
-
+void Robot::func(const double *source) {
+    // function is (x-xs)^2 + (y-ys)^2 where xs and ys is source location
+    robot_fitness = -(pow(position[0] - source[0], 2) + pow(position[1] - source[1], 2));
 }
 
+double *Robot::get_coordinates(){
+    return position;
+}
+
+double Robot::get_fitness() {
+    return robot_fitness;
+}
+
+void Robot::update_deltas() {
+    delta_f_prev = delta_f;
+    if(robot_fitness > robot_fitness_prev)
+        delta_f = 1;
+    else
+        delta_f = -1;
+    robot_fitness_prev = robot_fitness;
+}
