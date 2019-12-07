@@ -23,7 +23,7 @@ private:
      * @param global_best - global best position
      * @return weight for coordinates
      */
-    double get_weight(double w, int i, double global_best);
+    void set_weight(int i, double global_best);
 
     /**
     * Compute robot fitness function

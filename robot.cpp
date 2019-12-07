@@ -49,9 +49,8 @@ double Robot::update(const double *global_best, const double *source) {
         c = weight[i] + 1;
         velocity[i] = weight[i] * velocity[i] + c * r1 * (best_pos[i] - position[i]) +
                                                 c * r2 * (global_best[i] - position[i]);
-        if (velocity[i] > max_velocity)
+        if(velocity[i] > max_velocity)
             velocity[i] = max_velocity;
-
         new_position[i] = position[i] + velocity[i];
         if (new_position[i] > 150)
             position[i] = 150.0;
@@ -59,36 +58,32 @@ double Robot::update(const double *global_best, const double *source) {
             position[i] = -150;
         else
             position[i] = new_position[i];
-
     }
     func(source);
-//    cout << robot_fitness << " --- <" << position[0] << "; " << position[1] << "> " << endl;
     if(robot_fitness > robot_fitness_prev){
         best_pos[0] = position[0];
         best_pos[1] = position[1];
     }
     for(int i = 0; i < 2; i++) {
-        // todo update d(k)???
         update_deltas();
-        weight[i] = get_weight(weight[i], i, global_best[i]);
+        set_weight(i, global_best[i]);
     }
+    robot_fitness_prev = robot_fitness;
     return robot_fitness;
 }
 
-double Robot::get_weight(double w, int i, double global_best) {
-    double c_n = 1.0;
+void Robot::set_weight(int i, double global_best) {
+    double c_n = 0.5;
     double l = pow(2 * y_max, 2);
-
     if(delta_f_prev > 0 && delta_f > 0){
-        double function = (pow((position[i] - global_best), 3)/(c_n * l));
-        w = min(weight_limit[1], w + w_0 * exp(-function));
+        double function = pow(position[i] - global_best, 3)/(c_n * l);
+        weight[i] = min(weight_limit[1], weight[i] + w_0 * exp(-function));
     }
     else if(delta_f_prev < 0 && delta_f < 0){
-        double function = (pow((position[i] - global_best), 2)/(c_n * l));
-        w = max(weight_limit[0], w - w_0 * exp(-function));
+        double function = pow((position[i] - global_best), 2)/(c_n * l);
+        weight[i] = max(weight_limit[0], weight[i] - w_0 * exp(-function));
     }
     else{} // nothing to do
-    return w;
 }
 
 void Robot::func(const double *source) {
@@ -110,5 +105,4 @@ void Robot::update_deltas() {
         delta_f = 1;
     else
         delta_f = -1;
-    robot_fitness_prev = robot_fitness;
 }
