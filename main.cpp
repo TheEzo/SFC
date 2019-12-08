@@ -6,7 +6,7 @@
 #include <vector>
 
 
-int print_coordinates(Robot **robot, int count){
+int print_coordinates(Robot **robot, int count, double divergence){
     double *tmp_coordinates;
     double fitness;
     int total = 0;
@@ -14,9 +14,7 @@ int print_coordinates(Robot **robot, int count){
         tmp_coordinates = robot[i]->get_coordinates();
         std::cout << "Robot[" << i << "]: <" << tmp_coordinates[0] << "; " <<
         tmp_coordinates[1] << ">  fitness: " << robot[i]->get_fitness() << std::endl;
-        fitness = robot[i]->get_fitness();
-        fitness = fitness < 0 ? -fitness : fitness;
-        if(fitness < 0.0000001)
+        if(abs(robot[i]->get_fitness()) < divergence)
             total++;
     }
     return total;
@@ -24,12 +22,13 @@ int print_coordinates(Robot **robot, int count){
 
 
 int main(int argc, char **argv) {
+    // simulation args
     double max_velocity = 0.7, w_0 = 0.6, c0 = 0.0;
     double weight[2] = {0.4, 0.9};
     int robot_count = 8;
     int map_size = 150; // center in [0;0] size to each side of map -- 300*300 is total size
     double source[2] = {5, 5}; // acoustic source
-
+    // end of args
 
     srand(time(NULL));
     std::default_random_engine generator(rand());
@@ -54,8 +53,8 @@ int main(int argc, char **argv) {
     int index;
     vector<int> done_robots;
     int x = 0;
-    bool best_changed, achieved = false;
-    double divergence = 0.2;
+    bool best_changed;
+    double divergence = 0.4;
     if(argc == 2)
         divergence = atof(argv[1]);
     vector<int>::iterator it;
@@ -83,7 +82,6 @@ int main(int argc, char **argv) {
                 if(it == done_robots.end())
                     done_robots.push_back(i);
             }
-
             if(current_fitness > best_fitness){
                 best_changed = true;
                 best_fitness = current_fitness;
@@ -93,7 +91,7 @@ int main(int argc, char **argv) {
                 index = i;
             }
         }
-        if(best_changed && !achieved)
+        if(best_changed)
             cout << "New best position >> step: "<< x << " robot[" << index << "]: <" << global_best[0] << "; " << global_best[1] << ">" << std::endl;
         if(done_robots.size() - printed > 0){
             cout << done_robots.size() - printed <<
@@ -101,18 +99,20 @@ int main(int argc, char **argv) {
             " in step " << x << endl;
             printed = done_robots.size();
         }
-        if(!achieved && printed == robot_count) {
+        if(printed == robot_count) {
             cout << endl << "Target achieved with allowed divergence " << divergence <<
                  " in " << x << " steps" << endl;
-            print_coordinates(robot, robot_count);
+            /*print_coordinates(robot, robot_count);
             cout << endl << "Setting divergence close to zero to test, how many robots will achieve accurate target position" << endl;
             achieved = true;
-            divergence = 0.0;
+            divergence = 0.0;*/
+            break;
         }
     }
-    cout << "Robot statuses with divergence " << divergence <<
-    " in " << x << " steps" << endl;
-    int total = print_coordinates(robot, robot_count);
-    cout << total << " robot(s) have achieved accurate target position" << endl;
+    //cout << "Robot statuses with divergence " << divergence <<
+    //" in " << x << " steps" << endl;
+    cout << endl;
+    int total = print_coordinates(robot, robot_count, divergence);
+    cout << endl << total << " robot(s) have achieved target with requested divergence" << endl;
     return 0;
 }
